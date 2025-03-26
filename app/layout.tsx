@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import { Analytics } from "@vercel/analytics/react";
 
 export const metadata: Metadata = {
   title: "Umm Yahya's Bakery | Homemade Sweets & Desserts in Eagan, MN",
@@ -16,9 +17,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+
       <body>
         <Navbar />
         <main className="pt-[72px] md:pt-[80px]">{children}</main>
+        <Analytics />
         <Footer />
       </body>
     </html>
