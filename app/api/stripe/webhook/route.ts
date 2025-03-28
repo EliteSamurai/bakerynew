@@ -10,6 +10,12 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 // This is your Stripe webhook secret for verifying signatures
 const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET || "";
 
+export const config = {
+  api: {
+    bodyParser: false, // ❌ Disable automatic JSON parsing
+  },
+};
+
 export async function POST(request: NextRequest) {
   console.log("🔹 Webhook Received");
 
@@ -22,11 +28,12 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const payload = await request.text();
-  let event: Stripe.Event;
+  // Convert request to raw text (buffer)
+  const rawBody = await request.text();
 
+  let event: Stripe.Event;
   try {
-    event = stripe.webhooks.constructEvent(payload, signature, endpointSecret);
+    event = stripe.webhooks.constructEvent(rawBody, signature, endpointSecret);
   } catch (err: any) {
     console.error(`❌ Webhook signature verification failed: ${err.message}`);
     return NextResponse.json(
@@ -34,6 +41,8 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     );
   }
+
+  console.log(`✅ Webhook event received: ${event.type}`);
 
   switch (event.type) {
     case "payment_intent.succeeded":
@@ -50,27 +59,6 @@ export async function POST(request: NextRequest) {
       console.log(
         `❌ Payment failed: ${failedPaymentIntent.last_payment_error?.message}`
       );
-      break;
-
-    case "charge.succeeded":
-      const charge = event.data.object as Stripe.Charge;
-      const email = charge.metadata.customer_email;
-      const orderId = charge.metadata.order_id;
-
-      if (!email || !orderId) {
-        console.error("⚠️ Missing email or order ID in metadata");
-        return NextResponse.json(
-          { error: "Missing metadata" },
-          { status: 400 }
-        );
-      }
-
-      try {
-        await sendConfirmationEmail(email, orderId);
-        console.log(`📧 Confirmation email sent to ${email}`);
-      } catch (error) {
-        console.error("⚠️ Email sending failed:", error);
-      }
       break;
 
     default:
