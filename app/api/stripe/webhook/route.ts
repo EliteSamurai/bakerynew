@@ -8,7 +8,12 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 });
 
 // This is your Stripe webhook secret for verifying signatures
-const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET || "";
+const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET!;
+if (!endpointSecret) {
+  throw new Error(
+    "🚨 STRIPE_WEBHOOK_SECRET is missing in environment variables!"
+  );
+}
 
 export const config = {
   api: {
@@ -19,7 +24,8 @@ export const config = {
 export async function POST(request: NextRequest) {
   console.log("🔹 Webhook Received");
 
-  const signature = request.headers.get("stripe-signature") || "";
+  // Ensure signature exists
+  const signature = request.headers.get("stripe-signature");
   if (!signature) {
     console.error("🚨 Missing Stripe signature header");
     return NextResponse.json(
@@ -28,8 +34,8 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Convert request to raw text (buffer)
-  const rawBody = await request.text();
+  // Convert request to raw buffer (Fix for bodyParser: false issue)
+  const rawBody = await request.clone().text();
 
   let event: Stripe.Event;
   try {
@@ -45,27 +51,29 @@ export async function POST(request: NextRequest) {
   console.log(`✅ Webhook event received: ${event.type}`);
 
   switch (event.type) {
-    case "payment_intent.succeeded":
+    case "payment_intent.succeeded": {
       const paymentIntent = event.data.object as Stripe.PaymentIntent;
       console.log(
         `✅ PaymentIntent succeeded: $${(paymentIntent.amount / 100).toFixed(2)}`
       );
 
-      await handleSuccessfulPayment(paymentIntent);
+      await handleSuccessfulPayment(paymentIntent); // Call your function to handle successful payments
       break;
+    }
 
-    case "payment_intent.payment_failed":
+    case "payment_intent.payment_failed": {
       const failedPaymentIntent = event.data.object as Stripe.PaymentIntent;
       console.log(
         `❌ Payment failed: ${failedPaymentIntent.last_payment_error?.message}`
       );
       break;
+    }
 
     default:
       console.log(`🔹 Unhandled event type: ${event.type}`);
   }
 
-  return NextResponse.json({ received: true });
+  return NextResponse.json({ received: true }, { status: 200 });
 }
 
 // Function to send confirmation email
