@@ -56,6 +56,7 @@ const ProductCard = ({
           src={imageSrc} // Dynamic image based on selected topping
           alt={product.alt}
           fill
+          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
           className="object-cover transition-transform duration-500 hover:scale-105"
         />
         {product.isNew && (

@@ -17,22 +17,38 @@ export async function POST(request: NextRequest) {
     }
 
     // Create line items for Stripe
-    const lineItems = items.map((item: any) => ({
-      price_data: {
-        currency: "usd",
-        product_data: {
-          name: item.bottomName,
-          description: item.ingredients,
-          images: [
-            item.img && item.img.startsWith("http")
-              ? item.img
-              : `${process.env.NEXT_PUBLIC_BASE_URL}${item.img}`,
-          ],
+    const lineItems = items.map((item: any) => {
+      let imageUrl = "/default-image.jpg"; // Fallback in case of missing images
+
+      if (Array.isArray(item.img)) {
+        // If img is an array, take the first image as the primary one
+        imageUrl =
+          item.img.length > 0 && typeof item.img[0] === "string"
+            ? item.img[0]
+            : imageUrl;
+      } else if (typeof item.img === "string") {
+        // If img is a string, use it directly
+        imageUrl = item.img;
+      }
+
+      // Ensure full URL if it's not an absolute link
+      if (!imageUrl.startsWith("http")) {
+        imageUrl = `${process.env.NEXT_PUBLIC_BASE_URL}${imageUrl}`;
+      }
+
+      return {
+        price_data: {
+          currency: "usd",
+          product_data: {
+            name: item.bottomName,
+            description: item.ingredients,
+            images: [imageUrl], // Stripe expects an array
+          },
+          unit_amount: item.price, // Price is already in cents
         },
-        unit_amount: item.price, // Price is already in cents
-      },
-      quantity: item.quantity,
-    }));
+        quantity: item.quantity,
+      };
+    });
 
     // Calculate order metadata
     const orderTotal = items.reduce(
