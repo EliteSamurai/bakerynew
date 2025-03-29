@@ -21,6 +21,7 @@ import {
 import data from "@/lib/data";
 import Checkout from "@/lib/stripe";
 import { motion, AnimatePresence } from "framer-motion";
+import { useCart } from "@/context/CartContext";
 
 // Product Card Component
 const ProductCard = ({
@@ -31,11 +32,28 @@ const ProductCard = ({
   addToCart,
   handleBuyNow,
 }) => {
+  const [selectedTopping, setSelectedTopping] = useState(
+    product.selectedTopping || "sugar"
+  );
+
+  const handleToppingChange = (topping) => {
+    setSelectedTopping(topping); // Update selected topping state
+  };
+
+  // Determine the image source based on selected topping
+  const imageSrc =
+    product.img[selectedTopping] || product.img || "/placeholder.svg"; // If topping is selected, use that specific image, otherwise fallback to default image
+
+  const handleAddToCart = () => {
+    // Pass selected topping and image when adding to cart
+    addToCart({ ...product, selectedTopping, toppingImage: imageSrc });
+  };
+
   return (
     <div className="bg-white rounded-xl shadow-md overflow-hidden transition-all duration-300 hover:shadow-lg">
       <div className="relative h-72 overflow-hidden">
         <Image
-          src={product.img || "/placeholder.svg"}
+          src={imageSrc} // Dynamic image based on selected topping
           alt={product.alt}
           fill
           className="object-cover transition-transform duration-500 hover:scale-105"
@@ -78,6 +96,27 @@ const ProductCard = ({
           </div>
         ) : null}
 
+        {/* Topping Selection for Honeycomb Bread */}
+        {product.id === 6 && (
+          <div className="mt-4">
+            <span className="text-sm font-medium">Choose Topping:</span>
+            <div className="flex space-x-4 mt-2">
+              <button
+                onClick={() => handleToppingChange("sugar")}
+                className={`w-24 h-10 text-sm font-medium rounded-lg transition-colors ${selectedTopping === "sugar" ? "bg-[#e79fc4] text-white" : "bg-gray-200 text-gray-800"}`}
+              >
+                Sugar
+              </button>
+              <button
+                onClick={() => handleToppingChange("condensedMilk")}
+                className={`w-24 h-10 text-sm font-medium rounded-lg transition-colors ${selectedTopping === "condensedMilk" ? "bg-[#e79fc4] text-white" : "bg-gray-200 text-gray-800"}`}
+              >
+                Condensed Milk
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="mt-6 pt-4 border-t border-gray-100">
           <div className="flex flex-col space-y-3">
             <span className="text-2xl font-bold text-gray-800">
@@ -86,7 +125,7 @@ const ProductCard = ({
 
             <div className="grid grid-cols-2 gap-3">
               <button
-                onClick={() => addToCart(product, index)}
+                onClick={handleAddToCart} // Add to cart with selected topping
                 className="bg-[#e79fc4] hover:bg-[#e79fc4]/80 text-white px-4 py-3 rounded-lg transition-colors flex items-center justify-center shadow-sm"
               >
                 <FontAwesomeIcon icon={faShoppingCart} className="mr-2" />
@@ -94,7 +133,7 @@ const ProductCard = ({
               </button>
 
               <button
-                onClick={() => handleBuyNow(product)}
+                onClick={() => handleBuyNow(product, selectedTopping)} // Pass selected topping when buying now
                 className="bg-black hover:bg-gray-800 text-white px-4 py-3 rounded-lg transition-colors shadow-sm"
               >
                 Buy Now
@@ -118,20 +157,24 @@ const CartItem = ({
     <div className="flex items-start border-b border-gray-200 py-5">
       <div className="relative w-24 h-24 rounded-lg overflow-hidden flex-shrink-0">
         <Image
-          src={product.img || "/placeholder.svg"}
-          alt={product.alt}
+          src={product.toppingImage || "/placeholder.svg"}
+          alt={product.topName}
           fill
           className="object-cover"
         />
       </div>
 
       <div className="ml-5 flex-grow pt-1">
+        {/* Separate the topping in the title */}
         <h4 className="font-bold text-gray-800 text-base mb-1">
-          {product.topName}
+          {product.topName} -{" "}
+          {product.selectedTopping === "sugar" ? "Sugar" : "Condensed Milk"}
         </h4>
+
         <p className="text-gray-500 text-sm mb-1 line-clamp-1">
           {product.ingredients}
         </p>
+
         <div className="flex items-center justify-between mt-2">
           <span className="font-bold text-[#e79fc4] text-lg">
             ${((product.price / 100) * product.quantity).toFixed(2)}
@@ -139,7 +182,9 @@ const CartItem = ({
 
           <div className="flex items-center space-x-1">
             <button
-              onClick={() => decreaseQuantity(product.id)}
+              onClick={() =>
+                decreaseQuantity(product.id, product.selectedTopping)
+              }
               className="w-9 h-9 flex items-center justify-center bg-gray-100 rounded-l-lg hover:bg-gray-200 transition-colors"
               aria-label="Decrease quantity"
             >
@@ -151,7 +196,9 @@ const CartItem = ({
             </span>
 
             <button
-              onClick={() => increaseQuantity(product.id)}
+              onClick={() =>
+                increaseQuantity(product.id, product.selectedTopping)
+              }
               className="w-9 h-9 flex items-center justify-center bg-gray-100 rounded-r-lg hover:bg-gray-200 transition-colors"
               aria-label="Increase quantity"
             >
@@ -159,7 +206,7 @@ const CartItem = ({
             </button>
 
             <button
-              onClick={() => deleteItem(product.id)}
+              onClick={() => deleteItem(product.id, product.selectedTopping)}
               className="ml-4 w-9 h-9 flex items-center justify-center text-red-500 hover:bg-red-50 rounded-full transition-colors"
               aria-label="Remove item"
             >
@@ -341,9 +388,10 @@ const ProductFilter = ({ categories, activeCategory, setActiveCategory }) => {
 export default function Order() {
   // Extract unique categories from data
   const categories = [...new Set(data.map((item) => item.category || "Other"))];
+  const { addToCart } = useCart();
 
   // State variables
-  const [selectedProduct, setSelectedProduct] = useState([]);
+  const { selectedProduct, setSelectedProduct } = useCart();
   const [showCart, setShowCart] = useState(false);
   const [openStates, setOpenStates] = useState(Array(data.length).fill(false));
   const [selectedProductIndex, setSelectedProductIndex] = useState(-1);
@@ -370,34 +418,37 @@ export default function Order() {
   );
 
   // Toggle the cart and add products
-  const addToCart = (product, index) => {
-    const existingProductIndex = selectedProduct.findIndex(
-      (item) => item.id === product.id
-    );
+  // const addToCart = (product) => {
+  //   setCart((prevCart) => {
+  //     // Check if the exact same product + topping exists in the cart
+  //     const existingItem = prevCart.find(
+  //       (item) =>
+  //         item.id === product.id &&
+  //         item.selectedTopping === product.selectedTopping
+  //     );
 
-    if (existingProductIndex !== -1) {
-      // If the product already exists in the cart, update its quantity
-      const updatedProducts = [...selectedProduct];
-      updatedProducts[existingProductIndex].quantity += 1;
-      setSelectedProduct(updatedProducts);
-    } else {
-      // If the product doesn't exist in the cart, add it with quantity 1
-      setSelectedProduct((prevProducts) => [
-        ...prevProducts,
-        { ...product, quantity: 1 },
-      ]);
-    }
-
-    setSelectedProductIndex(index);
-    setShowCart(true);
-  };
+  //     if (existingItem) {
+  //       // If it exists, increase the quantity instead of merging different toppings
+  //       return prevCart.map((item) =>
+  //         item.id === product.id &&
+  //         item.selectedTopping === product.selectedTopping
+  //           ? { ...item, quantity: item.quantity + 1 }
+  //           : item
+  //       );
+  //     } else {
+  //       // Otherwise, add it as a new separate cart item
+  //       return [...prevCart, { ...product, quantity: 1 }];
+  //     }
+  //   });
+  // };
 
   // Delete a selected item from the cart
-  const deleteSelectedItem = (id) => {
-    setSelectedProduct((prevProducts) => {
-      const updatedProducts = prevProducts.filter((item) => item.id !== id);
-      return updatedProducts;
-    });
+  const deleteSelectedItem = (id, topping) => {
+    setSelectedProduct((prevProducts) =>
+      prevProducts.filter(
+        (item) => !(item.id === id && item.selectedTopping === topping)
+      )
+    );
   };
 
   // Hide the cart if no products are selected
@@ -413,33 +464,28 @@ export default function Order() {
   };
 
   // Increase the quantity of a product in the cart
-  const increaseQuantity = (productId) => {
-    const updatedProducts = selectedProduct.map((product) => {
-      if (product.id === productId) {
-        return {
-          ...product,
-          quantity: product.quantity + 1,
-        };
-      }
-      return product;
-    });
-
-    setSelectedProduct(updatedProducts);
+  const increaseQuantity = (id, topping) => {
+    setSelectedProduct((prevProducts) =>
+      prevProducts.map((product) =>
+        product.id === id && product.selectedTopping === topping
+          ? { ...product, quantity: product.quantity + 1 }
+          : product
+      )
+    );
   };
 
   // Decrease the quantity of a product in the cart
-  const decreaseQuantity = (productId) => {
-    const updatedProducts = selectedProduct.map((product) => {
-      if (product.id === productId && product.quantity > 1) {
-        return {
-          ...product,
-          quantity: product.quantity - 1,
-        };
-      }
-      return product;
-    });
-
-    setSelectedProduct(updatedProducts);
+  const decreaseQuantity = (id, topping) => {
+    setSelectedProduct(
+      (prevProducts) =>
+        prevProducts
+          .map((product) =>
+            product.id === id && product.selectedTopping === topping
+              ? { ...product, quantity: product.quantity - 1 }
+              : product
+          )
+          .filter((product) => product.quantity > 0) // Remove item if quantity reaches 0
+    );
   };
 
   // Hide or show the Order-page scroll bar
@@ -603,7 +649,7 @@ export default function Order() {
                   <div className="max-h-[450px] overflow-y-auto p-6">
                     {selectedProduct.map((product) => (
                       <CartItem
-                        key={product.id}
+                        key={`${product.id}-${product.selectedTopping}`}
                         product={product}
                         increaseQuantity={increaseQuantity}
                         decreaseQuantity={decreaseQuantity}
