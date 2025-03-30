@@ -56,15 +56,14 @@ export async function POST(request: NextRequest) {
       0
     );
 
-    // Create a payment intent
+    const orderId = `order_${Date.now()}`;
+
     const paymentIntent = await stripe.paymentIntents.create({
       amount: orderTotal,
       currency: "usd",
-      automatic_payment_methods: {
-        enabled: true,
-      },
+      automatic_payment_methods: { enabled: true },
       metadata: {
-        order_id: `order_${Date.now()}`,
+        order_id: orderId, // ✅ Store order ID here
         customer_name: customerInfo?.name || "Guest",
         customer_email: customerInfo?.email || "",
         pickup_date: customerInfo?.pickupDate || "",
@@ -82,6 +81,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       clientSecret: paymentIntent.client_secret,
       paymentIntentId: paymentIntent.id,
+      orderId, // ✅ Return order ID to the frontend
     });
   } catch (error: any) {
     console.error("Stripe API error:", error);

@@ -218,13 +218,13 @@ export default function Navbar() {
           {/* Desktop Action Buttons */}
           <div className="hidden md:flex items-center space-x-2">
             {/* Search Button */}
-            <button
+            {/* <button
               onClick={toggleSearch}
               className="p-2 rounded-full hover:bg-gray-100 transition-colors"
               aria-label="Search"
             >
               <FontAwesomeIcon icon={faSearch} className="text-gray-700" />
-            </button>
+            </button> */}
 
             {/* Cart Button */}
             <Link
