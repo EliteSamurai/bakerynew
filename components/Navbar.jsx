@@ -14,7 +14,7 @@ import {
   faClock,
 } from "@fortawesome/free-solid-svg-icons";
 import Logo from "@/public/images/ummyahya_optimized.png";
-import { useCart } from "@/context/CartContext";
+import { usePreorder } from "@/context/preordercontext";
 
 export default function Navbar() {
   const [isNavOpen, setIsNavOpen] = useState(false);
@@ -22,7 +22,7 @@ export default function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [activeLink, setActiveLink] = useState("/");
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const { selectedProduct } = useCart();
+  const { preorderList } = usePreorder();
 
   // Handle scroll effect
   useEffect(() => {
@@ -234,7 +234,7 @@ export default function Navbar() {
             >
               <FontAwesomeIcon icon={faShoppingBag} className="text-gray-700" />
               <span className="absolute -top-1 -right-1 bg-[#e79fc4] text-white text-xs w-5 h-5 flex items-center justify-center rounded-full">
-                {selectedProduct.reduce(
+                {preorderList.reduce(
                   (total, item) => total + item.quantity,
                   0
                 )}
@@ -355,7 +355,7 @@ export default function Navbar() {
                   <FontAwesomeIcon icon={faShoppingBag} className="mr-2" />
                   <span>
                     Cart ({" "}
-                    {selectedProduct.reduce(
+                    {preorderList.reduce(
                       (total, item) => total + item.quantity,
                       0
                     )}

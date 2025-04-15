@@ -19,9 +19,9 @@ import {
   faSpinner,
 } from "@fortawesome/free-solid-svg-icons";
 import data from "@/lib/data";
-import Checkout from "@/lib/stripe";
 import { motion, AnimatePresence } from "framer-motion";
-import { useCart } from "@/context/CartContext";
+import { PreorderProvider, usePreorder } from "@/context/preordercontext";
+import PreorderCheckout from "../../components/PreorderCheckout";
 
 // Product Card Component
 const ProductCard = ({
@@ -29,7 +29,7 @@ const ProductCard = ({
   index,
   isOpen,
   toggleModal,
-  addToCart,
+  addToPreorder,
   handleBuyNow,
 }) => {
   const [selectedTopping, setSelectedTopping] = useState(
@@ -44,9 +44,9 @@ const ProductCard = ({
   const imageSrc =
     product.img[selectedTopping] || product.img || "/placeholder.svg"; // If topping is selected, use that specific image, otherwise fallback to default image
 
-  const handleAddToCart = () => {
+  const handleAddToPreorder = () => {
     // Pass selected topping and image when adding to cart
-    addToCart({ ...product, selectedTopping, toppingImage: imageSrc });
+    addToPreorder({ ...product, selectedTopping, toppingImage: imageSrc });
   };
 
   return (
@@ -126,7 +126,7 @@ const ProductCard = ({
 
             <div className="grid grid-cols-2 gap-3">
               <button
-                onClick={handleAddToCart} // Add to cart with selected topping
+                onClick={handleAddToPreorder} // Add to cart with selected topping
                 className="bg-[#e79fc4] hover:bg-[#e79fc4]/80 text-white px-4 py-3 rounded-lg transition-colors flex items-center justify-center shadow-sm"
               >
                 <FontAwesomeIcon icon={faShoppingCart} className="mr-2" />
@@ -158,24 +158,21 @@ const CartItem = ({
     <div className="flex items-start border-b border-gray-200 py-5">
       <div className="relative w-24 h-24 rounded-lg overflow-hidden flex-shrink-0">
         <Image
-          src={product.toppingImage || "/placeholder.svg"}
-          alt={product.topName}
+          src={product.toppingImage || product.img || "/placeholder.svg"}
+          alt={product.alt}
           fill
           className="object-cover"
         />
       </div>
 
       <div className="ml-5 flex-grow pt-1">
-        {/* Separate the topping in the title */}
         <h4 className="font-bold text-gray-800 text-base mb-1">
-          {product.topName} -{" "}
-          {product.selectedTopping === "sugar" ? "Sugar" : "Condensed Milk"}
+          {product.topName}
         </h4>
-
         <p className="text-gray-500 text-sm mb-1 line-clamp-1">
           {product.ingredients}
+          {product.selectedTopping && ` - ${product.selectedTopping}`}
         </p>
-
         <div className="flex items-center justify-between mt-2">
           <span className="font-bold text-[#e79fc4] text-lg">
             ${((product.price / 100) * product.quantity).toFixed(2)}
@@ -389,13 +386,11 @@ const ProductFilter = ({ categories, activeCategory, setActiveCategory }) => {
 export default function Order() {
   // Extract unique categories from data
   const categories = [...new Set(data.map((item) => item.category || "Other"))];
-  const { addToCart } = useCart();
+  const { addToPreorder, preorderList } = usePreorder();
 
   // State variables
-  const { selectedProduct, setSelectedProduct } = useCart();
   const [showCart, setShowCart] = useState(false);
   const [openStates, setOpenStates] = useState(Array(data.length).fill(false));
-  const [selectedProductIndex, setSelectedProductIndex] = useState(-1);
   const [proceedToCheckout, setProceedToCheckout] = useState(false);
   const [activeCategory, setActiveCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -413,39 +408,14 @@ export default function Order() {
   });
 
   // Calculate cart subtotal
-  const subtotal = selectedProduct.reduce(
+  const subtotal = preorderList.reduce(
     (total, item) => total + (item.price / 100) * item.quantity,
     0
   );
 
-  // Toggle the cart and add products
-  // const addToCart = (product) => {
-  //   setCart((prevCart) => {
-  //     // Check if the exact same product + topping exists in the cart
-  //     const existingItem = prevCart.find(
-  //       (item) =>
-  //         item.id === product.id &&
-  //         item.selectedTopping === product.selectedTopping
-  //     );
-
-  //     if (existingItem) {
-  //       // If it exists, increase the quantity instead of merging different toppings
-  //       return prevCart.map((item) =>
-  //         item.id === product.id &&
-  //         item.selectedTopping === product.selectedTopping
-  //           ? { ...item, quantity: item.quantity + 1 }
-  //           : item
-  //       );
-  //     } else {
-  //       // Otherwise, add it as a new separate cart item
-  //       return [...prevCart, { ...product, quantity: 1 }];
-  //     }
-  //   });
-  // };
-
   // Delete a selected item from the cart
   const deleteSelectedItem = (id, topping) => {
-    setSelectedProduct((prevProducts) =>
+    setPreorderList((prevProducts) =>
       prevProducts.filter(
         (item) => !(item.id === id && item.selectedTopping === topping)
       )
@@ -454,10 +424,10 @@ export default function Order() {
 
   // Hide the cart if no products are selected
   useEffect(() => {
-    if (selectedProduct.length === 0) {
+    if (preorderList.length === 0) {
       setShowCart(false);
     }
-  }, [selectedProduct]);
+  }, [preorderList]);
 
   // Go back from the cart to the product selection
   const goBack = () => {
@@ -466,7 +436,7 @@ export default function Order() {
 
   // Increase the quantity of a product in the cart
   const increaseQuantity = (id, topping) => {
-    setSelectedProduct((prevProducts) =>
+    setPreorderList((prevProducts) =>
       prevProducts.map((product) =>
         product.id === id && product.selectedTopping === topping
           ? { ...product, quantity: product.quantity + 1 }
@@ -477,7 +447,7 @@ export default function Order() {
 
   // Decrease the quantity of a product in the cart
   const decreaseQuantity = (id, topping) => {
-    setSelectedProduct(
+    setPreorderList(
       (prevProducts) =>
         prevProducts
           .map((product) =>
@@ -511,23 +481,12 @@ export default function Order() {
 
   // Handle the Buy Now button click
   const handleBuyNowClick = (product) => {
-    if (selectedProduct.length === 0) {
-      setSelectedProduct([{ ...product, quantity: 1 }]);
-    } else {
-      const existingProductIndex = selectedProduct.findIndex(
-        (item) => item.id === product.id
-      );
-
-      if (existingProductIndex === -1) {
-        setSelectedProduct([...selectedProduct, { ...product, quantity: 1 }]);
-      }
-    }
-
+    addToPreorder({ ...product, quantity: 1 });
     setProceedToCheckout(true);
   };
 
   if (proceedToCheckout) {
-    return <Checkout selectedProduct={selectedProduct} />;
+    return <PreorderCheckout />;
   }
 
   return (
@@ -539,8 +498,9 @@ export default function Order() {
             Order Our Treats
           </h1>
           <p className="text-gray-600 text-center max-w-2xl mx-auto mb-8">
-            Browse our selection of freshly baked goods and place your order for
-            pickup. All items are made with love using the finest ingredients.
+            Browse our selection of freshly baked goods and place your preorder
+            for pickup. All items are made fresh to order with the finest
+            ingredients.
           </p>
 
           <div className="max-w-xl mx-auto relative">
@@ -583,9 +543,9 @@ export default function Order() {
             className="bg-[#e79fc4] text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center relative"
           >
             <FontAwesomeIcon icon={faShoppingCart} size="lg" />
-            {selectedProduct.length > 0 && (
+            {preorderList.length > 0 && (
               <span className="absolute -top-1 -right-1 bg-black text-white text-xs w-5 h-5 flex items-center justify-center rounded-full">
-                {selectedProduct.length}
+                {preorderList.length}
               </span>
             )}
           </button>
@@ -624,7 +584,7 @@ export default function Order() {
                     index={index}
                     isOpen={openStates[index]}
                     toggleModal={toggleModal}
-                    addToCart={addToCart}
+                    addToPreorder={addToPreorder}
                     handleBuyNow={handleBuyNowClick}
                   />
                 ))}
@@ -635,7 +595,7 @@ export default function Order() {
           {/* Cart (Desktop) */}
           <div className="md:w-1/4 hidden md:block">
             <div className="sticky top-24">
-              {selectedProduct.length > 0 ? (
+              {preorderList.length > 0 ? (
                 <div className="bg-white rounded-xl shadow-md overflow-hidden">
                   <div className="p-6 border-b border-gray-100">
                     <h2 className="text-xl font-bold flex items-center">
@@ -643,12 +603,12 @@ export default function Order() {
                         icon={faShoppingCart}
                         className="mr-2 text-[#e79fc4]"
                       />
-                      Your Cart ({selectedProduct.length})
+                      Your Cart ({preorderList.length})
                     </h2>
                   </div>
 
                   <div className="max-h-[450px] overflow-y-auto p-6">
-                    {selectedProduct.map((product) => (
+                    {preorderList.map((product) => (
                       <CartItem
                         key={`${product.id}-${product.selectedTopping}`}
                         product={product}
@@ -711,7 +671,7 @@ export default function Order() {
             >
               <div className="p-6 border-b border-gray-100 flex justify-between items-center">
                 <h2 className="text-xl font-bold">
-                  Your Cart ({selectedProduct.length})
+                  Your Cart ({preorderList.length})
                 </h2>
                 <button
                   onClick={() => setShowCart(false)}
@@ -721,7 +681,7 @@ export default function Order() {
                 </button>
               </div>
 
-              {selectedProduct.length === 0 ? (
+              {preorderList.length === 0 ? (
                 <div className="flex-grow overflow-y-auto p-6">
                   <div className="text-center py-8">
                     <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -741,7 +701,7 @@ export default function Order() {
               ) : (
                 <>
                   <div className="flex-grow overflow-y-auto p-6">
-                    {selectedProduct.map((product) => (
+                    {preorderList.map((product) => (
                       <CartItem
                         key={product.id}
                         product={product}
@@ -754,7 +714,7 @@ export default function Order() {
 
                   <div className="p-6 bg-gray-50">
                     <CartSummary
-                      products={selectedProduct}
+                      products={preorderList}
                       subtotal={subtotal}
                       goBack={goBack}
                       proceedToCheckout={() => setProceedToCheckout(true)}

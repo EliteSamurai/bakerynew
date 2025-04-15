@@ -3,7 +3,20 @@ import "./globals.css";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Analytics } from "@vercel/analytics/react";
-import { CartProvider } from "@/context/CartContext";
+import { PreorderProvider } from "@/context/preordercontext";
+import { Quicksand, Dancing_Script } from "next/font/google";
+
+const quicksand = Quicksand({
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700"],
+  variable: "--font-quicksand",
+});
+
+const dancingScript = Dancing_Script({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-dancing-script",
+});
 
 export const metadata: Metadata = {
   title: "Umm Yahya's Bakery | Homemade Sweets & Desserts in Eagan, MN",
@@ -17,14 +30,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body>
-        <CartProvider>
+    <html
+      lang="en"
+      className={`${quicksand.variable} ${dancingScript.variable}`}
+    >
+      <body className="font-sans">
+        <PreorderProvider>
           <Navbar />
           <main className="pt-[72px] md:pt-[80px]">{children}</main>
           <Analytics />
           <Footer />
-        </CartProvider>
+        </PreorderProvider>
       </body>
     </html>
   );
